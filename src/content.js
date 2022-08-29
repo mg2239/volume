@@ -4,18 +4,27 @@
   }
   window.hasRun = true;
 
-  const audioElts = document.querySelectorAll("audio");
-  const videoElts = document.querySelectorAll("video");
-
   const audioCtx = new AudioContext();
   const gainNode = audioCtx.createGain();
+  const ids = {};
 
-  const connect = (elt) => {
-    audioCtx.createMediaElementSource(elt).connect(gainNode);
+  const findAndConnect = () => {
+    const tags = ["audio", "video"];
+
+    tags.forEach((tag) => {
+      document.querySelectorAll(tag).forEach((element) => {
+        const identifier = element.id || element.className || element.src;
+        console.log("found " + identifier);
+        if (identifier in ids === false) {
+          console.log("attached " + identifier);
+          ids[identifier] = 1;
+          audioCtx.createMediaElementSource(element).connect(gainNode);
+        }
+      });
+    });
   };
 
-  audioElts.forEach(connect);
-  videoElts.forEach(connect);
+  findAndConnect();
 
   gainNode.connect(audioCtx.destination);
 
@@ -32,6 +41,7 @@
       case "getVolume":
         return Promise.resolve(getVolume());
       case "setVolume":
+        findAndConnect();
         setVolume(message.volume);
         break;
       default:
