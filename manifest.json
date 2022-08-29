@@ -1,15 +1,15 @@
 {
   "manifest_version": 2,
-  "name": "Volume Controller",
-  "version": "1.0",
-  "description": "Adds volume control to a tab.",
+  "name": "Tab Volume",
+  "version": "1.01",
+  "description": "Adds volume control to your tabs.",
   "homepage_url": "https://github.com/mg2239/volume",
   "icons": {
     "96": "src/assets/icon.svg"
   },
   "browser_action": {
     "default_icon": "src/assets/icon.svg",
-    "default_title": "Volume",
+    "default_title": "Tab Volume",
     "default_popup": "src/index.html"
   },
 
