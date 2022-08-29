@@ -18,12 +18,11 @@ const listenForChange = () => {
     })
     .catch(console.log);
 
-  slider.addEventListener("input", (e) => {
+  const handleChangeVolume = (volume) => {
     browser.tabs
       .query({ active: true, currentWindow: true })
       .then((tabs) => {
         if (tabs.length) {
-          const volume = e.target.value;
           update(volume);
           browser.tabs.sendMessage(tabs[0].id, {
             command: "setVolume",
@@ -32,6 +31,17 @@ const listenForChange = () => {
         }
       })
       .catch(console.log);
+  };
+
+  slider.addEventListener("input", (e) => {
+    handleChangeVolume(e.target.value);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const { key } = e;
+    if (key <= 5) {
+      handleChangeVolume(key);
+    }
   });
 };
 

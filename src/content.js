@@ -1,4 +1,9 @@
 (() => {
+  if (window.hasRun) {
+    return;
+  }
+  window.hasRun = true;
+
   const audioElts = document.querySelectorAll("audio");
   const videoElts = document.querySelectorAll("video");
 
@@ -19,7 +24,7 @@
   };
 
   const setVolume = (volume) => {
-    gainNode.gain.value = volume;
+    gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
   };
 
   browser.runtime.onMessage.addListener((message) => {
