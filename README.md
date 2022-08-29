@@ -9,3 +9,4 @@ Icon sourced from [Feather icons](https://feathericons.com/).
 ## TODO
 - Save volume on popup close
 - Change icon when volume changes
+- Save for certain sites
