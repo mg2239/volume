@@ -3,8 +3,9 @@
   "name": "Volume Controller",
   "version": "1.0",
   "description": "Adds volume control to a tab.",
+  "homepage_url": "https://github.com/mg2239/volume",
   "icons": {
-    "48": "src/assets/icon.svg"
+    "96": "src/assets/icon.svg"
   },
   "browser_action": {
     "default_icon": "src/assets/icon.svg",
