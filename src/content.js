@@ -14,9 +14,7 @@
     tags.forEach((tag) => {
       document.querySelectorAll(tag).forEach((element) => {
         const identifier = element.id || element.className || element.src;
-        console.log("found " + identifier);
         if (identifier in ids === false) {
-          console.log("attached " + identifier);
           ids[identifier] = 1;
           audioCtx.createMediaElementSource(element).connect(gainNode);
         }
@@ -43,6 +41,10 @@
       case "setVolume":
         findAndConnect();
         setVolume(message.volume);
+        browser.runtime.sendMessage({
+          tabId: message.tabId,
+          volume: message.volume,
+        });
         break;
       default:
         break;

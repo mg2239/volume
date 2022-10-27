@@ -14,7 +14,13 @@ const listenForChange = () => {
         .sendMessage(tabs[0].id, {
           command: "getVolume",
         })
-        .then(update);
+        .then((volume) => {
+          slider.removeAttribute("disabled");
+          update(volume);
+        })
+        .catch(() => {
+          slider.setAttribute("disabled", "");
+        });
     })
     .catch(console.log);
 
@@ -27,6 +33,7 @@ const listenForChange = () => {
           browser.tabs.sendMessage(tabs[0].id, {
             command: "setVolume",
             volume,
+            tabId: tabs[0].id,
           });
         }
       })
@@ -39,7 +46,7 @@ const listenForChange = () => {
 
   document.addEventListener("keydown", (e) => {
     const { key } = e;
-    if (key <= 5) {
+    if (Number(key) <= 5) {
       handleChangeVolume(key);
     }
   });
