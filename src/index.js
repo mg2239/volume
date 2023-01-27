@@ -1,11 +1,6 @@
-// Settings
-const onClick = () => {
-  const element = document.getElementById("settingsContainer");
-  element.hidden = !element.hidden;
-};
-
-// Volume handling
 const listenForChange = () => {
+  // VOLUME
+
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
 
@@ -56,6 +51,14 @@ const listenForChange = () => {
     if (Number(key) <= 5) {
       handleChangeVolume(key);
     }
+  });
+
+  // SETTINGS
+
+  const settingsButton = document.getElementById("settingsButton");
+  settingsButton.addEventListener("click", () => {
+    const settingsContainer = document.getElementById("settingsContainer");
+    settingsContainer.hidden = !settingsContainer.hidden;
   });
 };
 
