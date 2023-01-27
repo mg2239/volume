@@ -1,3 +1,10 @@
+// Settings
+const onClick = () => {
+  const element = document.getElementById("settingsContainer");
+  element.hidden = !element.hidden;
+};
+
+// Volume handling
 const listenForChange = () => {
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
