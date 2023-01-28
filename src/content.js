@@ -27,7 +27,14 @@
   gainNode.connect(audioCtx.destination);
 
   const getVolume = () => {
-    return gainNode.gain.value;
+    return browser.storage.local
+      .get("defaultVolume")
+      .then(({ defaultVolume }) => {
+        if (defaultVolume) {
+          return (defaultVolume / 100).toFixed(1);
+        }
+        return gainNode.gain.value;
+      });
   };
 
   const setVolume = (volume) => {
@@ -37,7 +44,7 @@
   browser.runtime.onMessage.addListener((message) => {
     switch (message.command) {
       case "getVolume":
-        return Promise.resolve(getVolume());
+        return getVolume();
       case "setVolume":
         findAndConnect();
         setVolume(message.volume);
