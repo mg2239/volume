@@ -4,6 +4,27 @@
   }
   window.hasRun = true;
 
+  // ========== UTIL ==========
+  const queryActiveTab = () => {
+    return new Promise((resolve) => {
+      browser.tabs
+        .query({ active: true, currentWindow: true })
+        .then((tabs) => {
+          if (tabs.length) {
+            resolve(tabs[0]);
+          }
+        })
+        .catch(console.log);
+    });
+  };
+
+  const getHostname = () => {
+    return queryActiveTab().then((tab) => {
+      const { hostname } = new URL(tab.url);
+      return hostname;
+    });
+  };
+
   const audioCtx = new AudioContext();
   const gainNode = audioCtx.createGain();
   const ids = {};
@@ -26,15 +47,17 @@
 
   gainNode.connect(audioCtx.destination);
 
-  const getVolume = () => {
-    return browser.storage.local
-      .get("defaultVolume")
-      .then(({ defaultVolume }) => {
-        if (defaultVolume) {
-          return (defaultVolume / 100).toFixed(1);
-        }
-        return gainNode.gain.value;
-      });
+  const getVolume = async () => {
+    const { defaultVolume } = await browser.storage.local.get("defaultVolume");
+    const hostname = await getHostname();
+    const res = await browser.storage.local.get(hostname);
+    if (hostname in res) {
+      return res.hostname;
+    }
+    if (defaultVolume) {
+      return defaultVolume;
+    }
+    return gainNode.gain.value;
   };
 
   const setVolume = (volume) => {

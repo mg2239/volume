@@ -5,10 +5,10 @@
   "description": "Adds volume control to your tabs.",
   "homepage_url": "https://github.com/mg2239/volume",
   "icons": {
-    "96": "src/assets/icon.svg"
+    "96": "src/assets/dev.svg"
   },
   "browser_action": {
-    "default_icon": "src/assets/icon.svg",
+    "default_icon": "src/assets/dev.svg",
     "default_title": "Tab Volume",
     "default_popup": "src/index.html"
   },

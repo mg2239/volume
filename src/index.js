@@ -13,13 +13,40 @@ const listenForChange = () => {
     });
   };
 
-  // ========== VOLUME ==========
+  const getHostname = () => {
+    return queryActiveTab().then((tab) => {
+      const { hostname } = new URL(tab.url);
+      return hostname;
+    });
+  };
+
+  // ========== ELEMENTS ==========
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
+  const settingsButton = document.getElementById("settingsButton");
+  const settingsContainer = document.getElementById("settingsContainer");
+  const rememberVolumeCheckbox = document.getElementById(
+    "rememberVolumeCheckbox"
+  );
 
-  const update = (volume) => {
+  // ========== VOLUME ==========
+  const update = (volume, tabId) => {
     text.textContent = `Volume: ${Math.round(volume * 100)}%`;
     slider.value = volume;
+
+    console.log(rememberVolumeCheckbox.checked);
+
+    if (rememberVolumeCheckbox.checked) {
+      getHostname().then((hostname) => {
+        browser.storage.local.set({ [hostname]: volume });
+      });
+    }
+
+    browser.tabs.sendMessage(tabId, {
+      command: "setVolume",
+      volume,
+      tabId,
+    });
   };
 
   queryActiveTab().then(({ id }) => {
@@ -29,12 +56,7 @@ const listenForChange = () => {
       })
       .then((volume) => {
         slider.removeAttribute("disabled");
-        update(volume);
-        browser.tabs.sendMessage(id, {
-          command: "setVolume",
-          volume,
-          tabId: id,
-        });
+        update(volume, id);
       })
       .catch(() => {
         slider.setAttribute("disabled", "");
@@ -42,73 +64,41 @@ const listenForChange = () => {
   });
 
   const handleChangeVolume = (volume) => {
-    queryActiveTab().then(({ id }) => {
-      update(volume);
-      browser.tabs.sendMessage(id, {
-        command: "setVolume",
-        volume,
-        tabId: id,
-      });
-    });
+    queryActiveTab().then(({ id }) => update(volume, id));
   };
 
   slider.addEventListener("input", (e) => {
     handleChangeVolume(e.target.value);
   });
 
-  // document.addEventListener("keydown", (e) => {
-  //   const { key } = e;
-  //   if (Number(key) <= 5) {
-  //     handleChangeVolume(key);
-  //   }
-  // });
-
-  // ========== SETTINGS ==========
-  const settingsButton = document.getElementById("settingsButton");
-  const settingsContainer = document.getElementById("settingsContainer");
-  const defaultVolumeInput = document.getElementById("defaultVolumeInput");
-  const rememberVolumeCheckbox = document.getElementById(
-    "rememberVolumeCheckbox"
-  );
-
-  browser.storage.local.get("defaultVolume").then(({ defaultVolume }) => {
-    if (defaultVolume) {
-      defaultVolumeInput.value = defaultVolume;
+  document.addEventListener("keydown", (e) => {
+    const { key } = e;
+    if (Number(key) <= 5 && settingsContainer.hidden) {
+      handleChangeVolume(key);
     }
   });
 
+  // ========== SETTINGS ==========
   settingsButton.addEventListener("click", () => {
     settingsContainer.hidden = !settingsContainer.hidden;
     browser.storage.local.get().then(console.log);
   });
 
-  defaultVolumeInput.addEventListener("change", (e) => {
-    let defaultVolume = parseInt(e.target.value);
-
-    if (isNaN(defaultVolume)) {
-      defaultVolume = 100;
-    }
-    if (defaultVolume < 0) {
-      defaultVolume = 0;
-    }
-    if (defaultVolume > 500) {
-      defaultVolume = 500;
-    }
-
-    defaultVolumeInput.value = defaultVolume;
-    browser.storage.local.set({ defaultVolume });
-  });
-
   rememberVolumeCheckbox.addEventListener("change", (e) => {
-    queryActiveTab().then((tab) => {
-      const { checked } = e.target;
-      const { hostname } = new URL(tab.url);
+    const { checked } = e.target;
+    getHostname().then((hostname) => {
       if (checked) {
-        browser.storage.local.set({
-          [hostname]: checked,
-        });
+        browser.storage.local.set({ [hostname]: slider.value });
       } else {
         browser.storage.local.remove(hostname);
+      }
+    });
+  });
+
+  getHostname().then((hostname) => {
+    browser.storage.local.get(hostname).then((res) => {
+      if (hostname in res) {
+        rememberVolumeCheckbox.checked = true;
       }
     });
   });
