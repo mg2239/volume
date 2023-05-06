@@ -1,41 +1,66 @@
 const listenForChange = () => {
+  // ========== UTIL ==========
+  const queryActiveTab = () => {
+    return new Promise((resolve) => {
+      browser.tabs
+        .query({ active: true, currentWindow: true })
+        .then((tabs) => {
+          if (tabs.length) {
+            resolve(tabs[0]);
+          }
+        })
+        .catch(console.log);
+    });
+  };
+
+  const getHostname = () => {
+    return queryActiveTab().then((tab) => {
+      const { hostname } = new URL(tab.url);
+      return hostname;
+    });
+  };
+
+  // ========== ELEMENTS ==========
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
+  const settingsButton = document.getElementById("settingsButton");
+  const settingsContainer = document.getElementById("settingsContainer");
+  const rememberVolumeCheckbox = document.getElementById(
+    "rememberVolumeCheckbox"
+  );
 
+  // ========== VOLUME ==========
   const update = (volume) => {
     text.textContent = `Volume: ${Math.round(volume * 100)}%`;
     slider.value = volume;
   };
 
-  browser.tabs
-    .query({ active: true, currentWindow: true })
-    .then((tabs) => {
+  queryActiveTab()
+    .then((tab) => {
       browser.tabs
-        .sendMessage(tabs[0].id, {
+        .sendMessage(tab.id, {
           command: "getVolume",
         })
         .then((volume) => {
           slider.removeAttribute("disabled");
           update(volume);
         })
-        .catch(() => {
+        .catch((err) => {
+          console.log(err);
           slider.setAttribute("disabled", "");
         });
     })
     .catch(console.log);
 
   const handleChangeVolume = (volume) => {
-    browser.tabs
-      .query({ active: true, currentWindow: true })
-      .then((tabs) => {
-        if (tabs.length) {
-          update(volume);
-          browser.tabs.sendMessage(tabs[0].id, {
-            command: "setVolume",
-            volume,
-            tabId: tabs[0].id,
-          });
-        }
+    queryActiveTab()
+      .then((tab) => {
+        update(volume);
+        browser.tabs.sendMessage(tab.id, {
+          command: "setVolume",
+          volume,
+          tabId: tab.id,
+        });
       })
       .catch(console.log);
   };
@@ -49,6 +74,12 @@ const listenForChange = () => {
     if (Number(key) <= 5) {
       handleChangeVolume(key);
     }
+  });
+
+  // ========== SETTINGS ==========
+  settingsButton.addEventListener("click", () => {
+    settingsContainer.hidden = !settingsContainer.hidden;
+    browser.storage.local.get().then(console.log);
   });
 };
 
