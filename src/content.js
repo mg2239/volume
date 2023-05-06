@@ -26,7 +26,10 @@
 
   gainNode.connect(audioCtx.destination);
 
-  const getVolume = () => {
+  const initVolume = (defaultVolume) => {
+    if (defaultVolume != null) {
+      gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
+    }
     return gainNode.gain.value;
   };
 
@@ -36,8 +39,8 @@
 
   browser.runtime.onMessage.addListener((message) => {
     switch (message.command) {
-      case "getVolume":
-        return Promise.resolve(getVolume());
+      case "initVolume":
+        return Promise.resolve(initVolume(message.defaultVolume));
       case "setVolume":
         findAndConnect();
         setVolume(message.volume);

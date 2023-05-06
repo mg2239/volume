@@ -37,18 +37,26 @@ const listenForChange = () => {
 
   queryActiveTab()
     .then((tab) => {
-      browser.tabs
-        .sendMessage(tab.id, {
-          command: "getVolume",
-        })
-        .then((volume) => {
-          slider.removeAttribute("disabled");
-          update(volume);
-        })
-        .catch((err) => {
-          console.log(err);
-          slider.setAttribute("disabled", "");
+      getHostname().then((hostname) => {
+        browser.storage.local.get().then((storage) => {
+          const hasDefault = hostname in storage;
+          const defaultVolume = hasDefault ? storage[hostname] : null;
+          rememberVolumeCheckbox.checked = hasDefault;
+          browser.tabs
+            .sendMessage(tab.id, {
+              command: "initVolume",
+              defaultVolume,
+            })
+            .then((volume) => {
+              slider.removeAttribute("disabled");
+              update(volume);
+            })
+            .catch((err) => {
+              console.log(err);
+              slider.setAttribute("disabled", "");
+            });
         });
+      });
     })
     .catch(console.log);
 
@@ -67,6 +75,11 @@ const listenForChange = () => {
 
   slider.addEventListener("input", (e) => {
     handleChangeVolume(e.target.value);
+    getHostname().then((hostname) => {
+      if (rememberVolumeCheckbox.checked) {
+        browser.storage.local.set({ [hostname]: slider.value });
+      }
+    });
   });
 
   document.addEventListener("keydown", (e) => {
@@ -79,7 +92,17 @@ const listenForChange = () => {
   // ========== SETTINGS ==========
   settingsButton.addEventListener("click", () => {
     settingsContainer.hidden = !settingsContainer.hidden;
-    browser.storage.local.get().then(console.log);
+  });
+
+  rememberVolumeCheckbox.addEventListener("change", (e) => {
+    const { checked } = e.target;
+    getHostname().then((hostname) => {
+      if (checked) {
+        browser.storage.local.set({ [hostname]: slider.value });
+      } else {
+        browser.storage.local.remove(hostname);
+      }
+    });
   });
 };
 
