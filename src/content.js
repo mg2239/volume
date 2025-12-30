@@ -8,6 +8,8 @@
   const gainNode = audioCtx.createGain();
   const ids = {};
 
+  gainNode.connect(audioCtx.destination);
+
   const findAndConnect = () => {
     const tags = ["audio", "video"];
 
@@ -20,56 +22,67 @@
         }
       });
     });
+    console.log("🚀 ~ findAndConnect ~ ids:", ids);
   };
 
-  findAndConnect();
+  const setVolume = (volume) => {
+    console.log("🚀 ~ setVolume ~ ids:", ids);
 
-  gainNode.connect(audioCtx.destination);
-
-  const initVolume = (defaultVolume) => {
-    if (defaultVolume != null) {
-      gainNode.gain.setTargetAtTime(defaultVolume, audioCtx.currentTime, 0.015);
+    if (volume != null) {
+      gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
     }
     return gainNode.gain.value;
   };
 
-  const setVolume = (volume) => {
-    gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
+  // Auto-apply saved volume on page load and URL changes (for SPAs like YouTube)
+  const applySavedVolume = () => {
+    const hostname = new URL(window.location.href).hostname;
+    browser.storage.local.get(hostname).then((storage) => {
+      if (!(hostname in storage)) return;
+
+      const savedVolume = storage[hostname];
+
+      // Set initial volume and update badge
+      setVolume(savedVolume);
+      browser.runtime.sendMessage({ volume: savedVolume });
+    });
   };
 
-  // Auto-apply saved volume on page load
-  const hostname = new URL(window.location.href).hostname;
-  browser.storage.local.get(hostname).then((storage) => {
-    if (!(hostname in storage)) return;
+  const handleMediaVolume = () => {
+    findAndConnect();
+    applySavedVolume();
+  };
 
-    const savedVolume = storage[hostname];
+  const observer = new MutationObserver(handleMediaVolume);
 
-    // Set initial volume and update badge
-    initVolume(savedVolume);
-    browser.runtime.sendMessage({ volume: savedVolume });
-
-    // Watch for new media elements being added to the page
-    const observer = new MutationObserver(findAndConnect);
-
-    const setupMediaWatcher = () => {
-      findAndConnect();
-      if (document.body) {
-        observer.observe(document.body, { childList: true, subtree: true });
-      }
-    };
-
-    // Wait for DOM to be ready before connecting media elements
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", setupMediaWatcher);
-    } else {
-      setupMediaWatcher();
+  const setupMedia = () => {
+    handleMediaVolume();
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
     }
-  });
+  };
+
+  // Apply on initial load
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupMedia);
+  } else {
+    setupMedia();
+  }
+
+  // Re-apply when URL changes (for SPAs like YouTube)
+  let lastUrl = window.location.href;
+  new MutationObserver(() => {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+      lastUrl = currentUrl;
+      handleMediaVolume();
+    }
+  }).observe(document, { subtree: true, childList: true });
 
   browser.runtime.onMessage.addListener((message) => {
     switch (message.command) {
       case "initVolume":
-        return Promise.resolve(initVolume(message.defaultVolume));
+        return Promise.resolve(setVolume(message.defaultVolume));
       case "setVolume":
         findAndConnect();
         setVolume(message.volume);

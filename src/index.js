@@ -23,6 +23,7 @@ const listenForChange = () => {
   // ========= ELEMENTS =========
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
+  const resetButton = document.getElementById("resetButton");
   const settingsButton = document.getElementById("settingsButton");
   const settingsContainer = document.getElementById("settingsContainer");
   const rememberVolumeCheckbox = document.getElementById(
@@ -33,22 +34,23 @@ const listenForChange = () => {
   const update = (volume) => {
     text.textContent = `Volume: ${Math.round(volume * 100)}%`;
     slider.value = volume;
+
+    // Show/hide reset button based on volume
+    resetButton.hidden = Math.round(volume * 100) === 100;
   };
 
   Promise.all([queryActiveTab(), getHostname(), browser.storage.local.get()])
-    .then(([tab, hostname, storage]) => {
+    .then(async ([tab, hostname, storage]) => {
       const hasDefault = hostname in storage;
       const defaultVolume = hasDefault ? storage[hostname] : null;
       rememberVolumeCheckbox.checked = hasDefault;
 
-      return browser.tabs.sendMessage(tab.id, {
+      browser.tabs.sendMessage(tab.id, {
         command: "initVolume",
         defaultVolume,
       });
-    })
-    .then((volume) => {
       slider.removeAttribute("disabled");
-      update(volume);
+      update(defaultVolume);
     })
     .catch((err) => {
       console.log(err);
@@ -75,6 +77,10 @@ const listenForChange = () => {
 
   slider.addEventListener("input", (e) => {
     handleChangeVolume(e.target.value);
+  });
+
+  resetButton.addEventListener("click", () => {
+    handleChangeVolume(1);
   });
 
   document.addEventListener("keydown", (e) => {
