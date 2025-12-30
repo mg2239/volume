@@ -1,5 +1,5 @@
 const listenForChange = () => {
-  // ========== UTIL ==========
+  // ========= UTIL =========
   const queryActiveTab = () => {
     return new Promise((resolve) => {
       browser.tabs
@@ -20,7 +20,7 @@ const listenForChange = () => {
     });
   };
 
-  // ========== ELEMENTS ==========
+  // ========= ELEMENTS =========
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
   const settingsButton = document.getElementById("settingsButton");
@@ -29,57 +29,52 @@ const listenForChange = () => {
     "rememberVolumeCheckbox"
   );
 
-  // ========== VOLUME ==========
+  // ========= VOLUME =========
   const update = (volume) => {
     text.textContent = `Volume: ${Math.round(volume * 100)}%`;
     slider.value = volume;
   };
 
-  queryActiveTab()
-    .then((tab) => {
-      getHostname().then((hostname) => {
-        browser.storage.local.get().then((storage) => {
-          const hasDefault = hostname in storage;
-          const defaultVolume = hasDefault ? storage[hostname] : null;
-          rememberVolumeCheckbox.checked = hasDefault;
-          browser.tabs
-            .sendMessage(tab.id, {
-              command: "initVolume",
-              defaultVolume,
-            })
-            .then((volume) => {
-              slider.removeAttribute("disabled");
-              update(volume);
-            })
-            .catch((err) => {
-              console.log(err);
-              slider.setAttribute("disabled", "");
-            });
-        });
+  Promise.all([queryActiveTab(), getHostname(), browser.storage.local.get()])
+    .then(([tab, hostname, storage]) => {
+      const hasDefault = hostname in storage;
+      const defaultVolume = hasDefault ? storage[hostname] : null;
+      rememberVolumeCheckbox.checked = hasDefault;
+
+      return browser.tabs.sendMessage(tab.id, {
+        command: "initVolume",
+        defaultVolume,
       });
     })
-    .catch(console.log);
+    .then((volume) => {
+      slider.removeAttribute("disabled");
+      update(volume);
+    })
+    .catch((err) => {
+      console.log(err);
+      slider.setAttribute("disabled", "");
+    });
 
   const handleChangeVolume = (volume) => {
+    update(volume);
     queryActiveTab()
       .then((tab) => {
-        update(volume);
         browser.tabs.sendMessage(tab.id, {
           command: "setVolume",
           volume,
-          tabId: tab.id,
         });
       })
       .catch(console.log);
+
+    if (rememberVolumeCheckbox.checked) {
+      getHostname().then((hostname) => {
+        browser.storage.local.set({ [hostname]: volume });
+      });
+    }
   };
 
   slider.addEventListener("input", (e) => {
     handleChangeVolume(e.target.value);
-    getHostname().then((hostname) => {
-      if (rememberVolumeCheckbox.checked) {
-        browser.storage.local.set({ [hostname]: slider.value });
-      }
-    });
   });
 
   document.addEventListener("keydown", (e) => {
@@ -89,7 +84,7 @@ const listenForChange = () => {
     }
   });
 
-  // ========== SETTINGS ==========
+  // ========= SETTINGS =========
   settingsButton.addEventListener("click", () => {
     settingsContainer.hidden = !settingsContainer.hidden;
   });
@@ -106,7 +101,4 @@ const listenForChange = () => {
   });
 };
 
-browser.tabs
-  .executeScript({ file: "/src/content.js" })
-  .then(listenForChange)
-  .catch(console.log);
+listenForChange();
