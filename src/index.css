@@ -38,26 +38,44 @@ body {
 
 /** RESET BUTTON **/
 
-#resetButton {
+/* Sized to the text so it stays centered; the button hangs off its right edge */
+#volumeRow {
+  position: relative;
   width: fit-content;
-  padding: 0.5rem;
-  margin: auto;
-  background-color: #0060df;
-  color: white;
+  margin: 0 auto;
+}
+
+#resetButton {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0.5rem;
+  padding: 0.25rem;
+  background-color: transparent;
+  color: #5b5b66;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+  line-height: 0;
   transition: background-color 0.2s;
 }
 
 #resetButton:hover {
-  background-color: #0050c5;
+  background-color: rgba(128, 128, 128, 0.2);
 }
 
 #resetButton:active {
-  background-color: #0040a8;
+  background-color: rgba(128, 128, 128, 0.35);
+}
+
+/* Masked so the icon takes the button's color in both themes */
+#resetIcon {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  background-color: currentColor;
+  mask: url("assets/rotate-ccw-dot.svg") center / contain no-repeat;
 }
 
 /** SETTINGS **/
@@ -75,5 +93,9 @@ body {
   body {
     background-color: #1c1b22;
     color: white;
+  }
+
+  #resetButton {
+    color: #bfbfc9;
   }
 }

@@ -9,9 +9,27 @@
   </head>
   <body>
     <div id="container">
-      <p id="text">Volume: 100%</p>
-      <input id="slider" type="range" min="0" max="5" value="1" step="0.1" disabled />
-      <button id="resetButton" hidden disabled>Reset to 100%</button>
+      <div id="volumeRow">
+        <p id="text">Volume: 100%</p>
+        <button
+          id="resetButton"
+          title="Reset to 100%"
+          aria-label="Reset to 100%"
+          hidden
+          disabled
+        >
+          <span id="resetIcon"></span>
+        </button>
+      </div>
+      <input
+        id="slider"
+        type="range"
+        min="0"
+        max="5"
+        value="1"
+        step="0.1"
+        disabled
+      />
       <div id="settingsContainer">
         <div class="settingsSection">
           <label class="settingsLabel" for="rememberVolumeCheckbox">
