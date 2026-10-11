@@ -4,91 +4,100 @@
   }
   window.hasRun = true;
 
-  const audioCtx = new AudioContext();
-  const gainNode = audioCtx.createGain();
-  const ids = {};
+  const hostname = window.location.hostname;
+  const connected = new WeakSet();
+  let volume = 1;
+  let audioCtx = null;
+  let gainNode = null;
 
-  gainNode.connect(audioCtx.destination);
+  // The audio graph is only created once the volume differs from 100%, so
+  // pages we never touch keep their normal audio pipeline.
+  const ensureAudioGraph = () => {
+    if (audioCtx) {
+      return;
+    }
+    audioCtx = new AudioContext();
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = volume;
+    gainNode.connect(audioCtx.destination);
+  };
+
+  // Media routed through a suspended AudioContext is silent, and contexts
+  // start suspended without a user gesture, so resume whenever we can.
+  const resume = () => {
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+  };
+
+  const connect = (element) => {
+    if (!audioCtx || connected.has(element)) {
+      return;
+    }
+    connected.add(element);
+    try {
+      audioCtx.createMediaElementSource(element).connect(gainNode);
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
   const findAndConnect = () => {
-    const tags = ["audio", "video"];
-
-    tags.forEach((tag) => {
-      document.querySelectorAll(tag).forEach((element) => {
-        const identifier = element.id || element.className || element.src;
-        if (identifier in ids === false) {
-          ids[identifier] = 1;
-          audioCtx.createMediaElementSource(element).connect(gainNode);
-        }
-      });
-    });
-    console.log("🚀 ~ findAndConnect ~ ids:", ids);
+    document.querySelectorAll("audio, video").forEach(connect);
   };
 
-  const setVolume = (volume) => {
-    console.log("🚀 ~ setVolume ~ ids:", ids);
-
-    if (volume != null) {
-      gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
+  const setVolume = (newVolume, smooth = true) => {
+    volume = Number(newVolume);
+    if (volume !== 1) {
+      ensureAudioGraph();
     }
-    return gainNode.gain.value;
-  };
-
-  // Auto-apply saved volume on page load and URL changes (for SPAs like YouTube)
-  const applySavedVolume = () => {
-    const hostname = new URL(window.location.href).hostname;
-    browser.storage.local.get(hostname).then((storage) => {
-      if (!(hostname in storage)) return;
-
-      const savedVolume = storage[hostname];
-
-      // Set initial volume and update badge
-      setVolume(savedVolume);
-      browser.runtime.sendMessage({ volume: savedVolume });
-    });
-  };
-
-  const handleMediaVolume = () => {
+    if (!audioCtx) {
+      return;
+    }
     findAndConnect();
-    applySavedVolume();
-  };
-
-  const observer = new MutationObserver(handleMediaVolume);
-
-  const setupMedia = () => {
-    handleMediaVolume();
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true });
+    resume();
+    if (smooth) {
+      gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.015);
+    } else {
+      gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+      gainNode.gain.value = volume;
     }
   };
 
-  // Apply on initial load
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupMedia);
-  } else {
-    setupMedia();
-  }
+  // `play` doesn't bubble, but a capturing listener on the document still
+  // sees it, which catches media elements whenever they are added.
+  document.addEventListener(
+    "play",
+    (e) => {
+      if (e.target instanceof HTMLMediaElement) {
+        connect(e.target);
+        resume();
+      }
+    },
+    true
+  );
+  ["pointerdown", "keydown"].forEach((type) => {
+    document.addEventListener(type, resume, true);
+  });
 
-  // Re-apply when URL changes (for SPAs like YouTube)
-  let lastUrl = window.location.href;
-  new MutationObserver(() => {
-    const currentUrl = window.location.href;
-    if (currentUrl !== lastUrl) {
-      lastUrl = currentUrl;
-      handleMediaVolume();
-    }
-  }).observe(document, { subtree: true, childList: true });
+  const ready = browser.storage.local
+    .get(hostname)
+    .then((storage) => {
+      if (hostname in storage) {
+        const savedVolume = Number(storage[hostname]);
+        setVolume(savedVolume, false);
+        browser.runtime.sendMessage({ volume: savedVolume });
+      }
+    })
+    .catch(console.log);
 
   browser.runtime.onMessage.addListener((message) => {
     switch (message.command) {
-      case "initVolume":
-        return Promise.resolve(setVolume(message.defaultVolume));
+      case "getVolume":
+        return ready.then(() => volume);
       case "setVolume":
-        findAndConnect();
         setVolume(message.volume);
-        browser.runtime.sendMessage({
-          volume: message.volume,
-        });
+        browser.runtime.sendMessage({ volume });
         break;
       default:
         break;

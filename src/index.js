@@ -1,31 +1,22 @@
 const listenForChange = () => {
   // ========= UTIL =========
-  const queryActiveTab = () => {
-    return new Promise((resolve) => {
-      browser.tabs
-        .query({ active: true, currentWindow: true })
-        .then((tabs) => {
-          if (tabs.length) {
-            resolve(tabs[0]);
-          }
-        })
-        .catch(console.log);
+  // The popup closes whenever the active tab changes, so this only needs to be
+  // looked up once.
+  const activeTab = browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then(([tab]) => {
+      if (!tab) {
+        throw new Error("No active tab");
+      }
+      return tab;
     });
-  };
 
-  const getHostname = () => {
-    return queryActiveTab().then((tab) => {
-      const { hostname } = new URL(tab.url);
-      return hostname;
-    });
-  };
+  const hostnamePromise = activeTab.then((tab) => new URL(tab.url).hostname);
 
   // ========= ELEMENTS =========
   const text = document.getElementById("text");
   const slider = document.getElementById("slider");
   const resetButton = document.getElementById("resetButton");
-  const settingsButton = document.getElementById("settingsButton");
-  const settingsContainer = document.getElementById("settingsContainer");
   const rememberVolumeCheckbox = document.getElementById(
     "rememberVolumeCheckbox"
   );
@@ -39,39 +30,60 @@ const listenForChange = () => {
     resetButton.hidden = Math.round(volume * 100) === 100;
   };
 
-  Promise.all([queryActiveTab(), getHostname(), browser.storage.local.get()])
-    .then(async ([tab, hostname, storage]) => {
-      const hasDefault = hostname in storage;
-      const defaultVolume = hasDefault ? storage[hostname] : null;
-      rememberVolumeCheckbox.checked = hasDefault;
+  // Tabs that were open before the extension was installed don't have the
+  // content script yet, so inject it and try again.
+  const getTabVolume = (tab) => {
+    const getVolume = () =>
+      browser.tabs.sendMessage(tab.id, { command: "getVolume" });
+    return getVolume().catch(() =>
+      browser.tabs
+        .executeScript(tab.id, { file: "/src/content.js" })
+        .then(getVolume)
+    );
+  };
 
-      browser.tabs.sendMessage(tab.id, {
-        command: "initVolume",
-        defaultVolume,
-      });
-      slider.removeAttribute("disabled");
-      update(defaultVolume);
-    })
-    .catch((err) => {
-      console.log(err);
-      slider.setAttribute("disabled", "");
-    });
+  // Controls stay disabled until the tab responds, so pages the extension
+  // can't run on (about:, addons.mozilla.org, etc.) can't be changed or saved.
+  let enabled = false;
 
-  const handleChangeVolume = (volume) => {
+  Promise.all([activeTab, hostnamePromise])
+    .then(([tab, hostname]) =>
+      Promise.all([
+        getTabVolume(tab),
+        hostname ? browser.storage.local.get(hostname) : null,
+      ]).then(([volume, storage]) => {
+        enabled = true;
+        slider.disabled = false;
+        resetButton.disabled = false;
+        update(volume);
+        // Pages without a hostname (e.g. file://) have nothing to save against
+        if (storage) {
+          rememberVolumeCheckbox.disabled = false;
+          rememberVolumeCheckbox.checked = hostname in storage;
+        }
+      })
+    )
+    .catch(console.log);
+
+  const handleChangeVolume = (value) => {
+    if (!enabled) {
+      return;
+    }
+    const volume = Number(value);
     update(volume);
-    queryActiveTab()
-      .then((tab) => {
+    activeTab
+      .then((tab) =>
         browser.tabs.sendMessage(tab.id, {
           command: "setVolume",
           volume,
-        });
-      })
+        })
+      )
       .catch(console.log);
 
     if (rememberVolumeCheckbox.checked) {
-      getHostname().then((hostname) => {
-        browser.storage.local.set({ [hostname]: volume });
-      });
+      hostnamePromise
+        .then((hostname) => browser.storage.local.set({ [hostname]: volume }))
+        .catch(console.log);
     }
   };
 
@@ -85,25 +97,21 @@ const listenForChange = () => {
 
   document.addEventListener("keydown", (e) => {
     const { key } = e;
-    if (Number(key) <= 5) {
+    if (/^[0-5]$/.test(key)) {
       handleChangeVolume(key);
     }
   });
 
   // ========= SETTINGS =========
-  settingsButton.addEventListener("click", () => {
-    settingsContainer.hidden = !settingsContainer.hidden;
-  });
-
   rememberVolumeCheckbox.addEventListener("change", (e) => {
     const { checked } = e.target;
-    getHostname().then((hostname) => {
-      if (checked) {
-        browser.storage.local.set({ [hostname]: slider.value });
-      } else {
-        browser.storage.local.remove(hostname);
-      }
-    });
+    hostnamePromise
+      .then((hostname) =>
+        checked
+          ? browser.storage.local.set({ [hostname]: Number(slider.value) })
+          : browser.storage.local.remove(hostname)
+      )
+      .catch(console.log);
   });
 };
 
