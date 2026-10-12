@@ -1,3 +1,6 @@
+// Only needed to apply remembered volumes on page load; see background.js.
+const ALL_SITES = { origins: ["<all_urls>"] };
+
 const listenForChange = () => {
   // ========= UTIL =========
   // The popup closes whenever the active tab changes, so this only needs to be
@@ -51,7 +54,8 @@ const listenForChange = () => {
       Promise.all([
         getTabVolume(tab),
         hostname ? browser.storage.local.get(hostname) : null,
-      ]).then(([volume, storage]) => {
+        browser.permissions.contains(ALL_SITES),
+      ]).then(([volume, storage, granted]) => {
         enabled = true;
         slider.disabled = false;
         resetButton.disabled = false;
@@ -59,7 +63,9 @@ const listenForChange = () => {
         // Pages without a hostname (e.g. file://) have nothing to save against
         if (storage) {
           rememberVolumeCheckbox.disabled = false;
-          rememberVolumeCheckbox.checked = hostname in storage;
+          // Without the permission a saved volume isn't applied on load, so
+          // don't claim it's remembered.
+          rememberVolumeCheckbox.checked = granted && hostname in storage;
         }
       })
     )
@@ -112,6 +118,24 @@ const listenForChange = () => {
           : browser.storage.local.remove(hostname)
       )
       .catch(console.log);
+
+    // Firefox only shows the prompt when this is called directly from the
+    // user's click, so it can't wait on the storage write above. If access is
+    // already granted it resolves right away without prompting.
+    if (checked) {
+      browser.permissions
+        .request(ALL_SITES)
+        .then((granted) => {
+          if (!granted) {
+            rememberVolumeCheckbox.checked = false;
+            return hostnamePromise.then((hostname) =>
+              browser.storage.local.remove(hostname)
+            );
+          }
+          return null;
+        })
+        .catch(console.log);
+    }
   });
 };
 
